@@ -29,10 +29,11 @@ serve(async (req) => {
   }
 
   const expectedHotTok = Deno.env.get("EVIDENCE_HOTMART_HOTTOK")?.trim();
-  const expectedProductUcode = Deno.env.get("EVIDENCE_HOTMART_PRODUCT_UCODE")?.trim();
+  const expectedProductIdRaw = Deno.env.get("EVIDENCE_HOTMART_PRODUCT_ID")?.trim();
+  const expectedProductId = Number(expectedProductIdRaw);
 
-  if (!expectedHotTok || !expectedProductUcode) {
-    console.error("Missing EVIDENCE_HOTMART_HOTTOK or EVIDENCE_HOTMART_PRODUCT_UCODE");
+  if (!expectedHotTok || !expectedProductIdRaw || !Number.isFinite(expectedProductId)) {
+    console.error("Missing or invalid EVIDENCE_HOTMART_HOTTOK / EVIDENCE_HOTMART_PRODUCT_ID");
     return Response.json({ error: "server_not_configured" }, { status: 503 });
   }
 
@@ -65,7 +66,9 @@ serve(async (req) => {
     productUcode === HOTMART_TEST_UCODE &&
     email.endsWith("@example.com");
 
-  if (productUcode !== expectedProductUcode && !isOfficialHotmartTest) {
+  const isRealProduct = productId === expectedProductId;
+
+  if (!isRealProduct && !isOfficialHotmartTest) {
     return Response.json({ ok: true, ignored: "different_product" });
   }
 
@@ -102,7 +105,12 @@ serve(async (req) => {
   }
 
   if (active === null) {
-    return Response.json({ ok: true, ignored: event, eventId, testMode: isOfficialHotmartTest });
+    return Response.json({
+      ok: true,
+      ignored: event,
+      eventId,
+      testMode: isOfficialHotmartTest,
+    });
   }
 
   const purchaseDate = toIso(purchase.approved_date || purchase.order_date);
@@ -133,5 +141,6 @@ serve(async (req) => {
     active,
     courseSlug: COURSE_SLUG,
     testMode: isOfficialHotmartTest,
+    productId,
   });
 });
