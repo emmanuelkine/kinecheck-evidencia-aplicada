@@ -1,1 +1,10 @@
-window.KINECHECK_CONFIG=Object.freeze({supabaseUrl:'https://eqhcdclyeoapmqtlduwf.supabase.co',supabaseAnonKey:'sb_publishable_FTwhDZYCF3zf7W9rB7bFwQ_rF9Y7OX_',courseSlug:'evidencia-aplicada',courseKeyFunction:'evidence-access',progressTable:'learning_progress',supportEmail:'emmanuelkine@gmail.com'});
+window.KINECHECK_CONFIG=Object.freeze({
+  supabaseUrl:'https://eqhcdclyeoapmqtlduwf.supabase.co',
+  supabaseAnonKey:'sb_publishable_FTwhDZYCF3zf7W9rB7bFwQ_rF9Y7OX_',
+  courseSlug:'evidencia-aplicada',
+  accessFunction:'evidence-access',
+  contentFunction:'evidence-content',
+  progressTable:'learning_progress',
+  supportEmail:'emmanuelkine@gmail.com',
+  appVersion:'2026.07.28.4'
+});
