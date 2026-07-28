@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Curso clínico interactivo de evidencia aplicada del ecosistema KineCheck.">
+  <meta name="theme-color" content="#0e304c">
+  <title>KineCheck Evidencia Aplicada</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="logo">KC</div><div><strong>KineCheck Evidencia Aplicada</strong><span>Aprender a pensar clínicamente con evidencia</span></div></div>
+    <div id="progress">Ruta personal 0%</div>
+  </header>
+  <aside class="sidebar">
+    <button data-view="home" class="active">Inicio</button>
+    <button data-view="library">Biblioteca de evidencia</button>
+    <button data-view="notebook">Cuaderno clínico</button>
+    <div id="nav"></div>
+    <button data-view="integration">Laboratorio integrador</button>
+  </aside>
+  <main id="app"></main>
+  <script src="course-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
