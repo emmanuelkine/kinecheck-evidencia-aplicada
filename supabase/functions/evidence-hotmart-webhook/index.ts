@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const COURSE_SLUG = "evidencia-aplicada";
+const HOTMART_TEST_UCODE = "fb056612-bcc6-4217-9e6d-2a5d1110ac2f";
+const HOTMART_TEST_PRODUCT_NAME = "Produto test postback2";
 const APPROVE = new Set(["PURCHASE_APPROVED", "PURCHASE_COMPLETE"]);
 const REVOKE = new Set(["PURCHASE_REFUNDED", "PURCHASE_CANCELED", "PURCHASE_CHARGEBACK"]);
 
@@ -48,6 +50,8 @@ serve(async (req) => {
 
   const email = String(buyer.email || "").trim().toLowerCase();
   const productUcode = String(product.ucode || "").trim();
+  const productName = String(product.name || "").trim();
+  const productId = Number(product.id ?? -1);
   const transactionId = String(purchase.transaction || "").trim();
   const eventId = String(body.id || `${event}:${transactionId}:${email}`).trim();
 
@@ -55,7 +59,13 @@ serve(async (req) => {
   if (!email) return Response.json({ error: "email_missing" }, { status: 400 });
   if (!productUcode) return Response.json({ error: "product_ucode_missing" }, { status: 400 });
 
-  if (productUcode !== expectedProductUcode) {
+  const isOfficialHotmartTest =
+    productId === 0 &&
+    productName === HOTMART_TEST_PRODUCT_NAME &&
+    productUcode === HOTMART_TEST_UCODE &&
+    email.endsWith("@example.com");
+
+  if (productUcode !== expectedProductUcode && !isOfficialHotmartTest) {
     return Response.json({ ok: true, ignored: "different_product" });
   }
 
@@ -92,7 +102,7 @@ serve(async (req) => {
   }
 
   if (active === null) {
-    return Response.json({ ok: true, ignored: event, eventId });
+    return Response.json({ ok: true, ignored: event, eventId, testMode: isOfficialHotmartTest });
   }
 
   const purchaseDate = toIso(purchase.approved_date || purchase.order_date);
@@ -108,7 +118,7 @@ serve(async (req) => {
     last_event: event,
     purchase_date: purchaseDate,
     warranty_date: warrantyDate,
-    access_source: "hotmart",
+    access_source: isOfficialHotmartTest ? "hotmart_test" : "hotmart",
     updated_at: new Date().toISOString(),
   }, { onConflict: "email,course_slug" });
 
@@ -122,5 +132,6 @@ serve(async (req) => {
     email,
     active,
     courseSlug: COURSE_SLUG,
+    testMode: isOfficialHotmartTest,
   });
 });
