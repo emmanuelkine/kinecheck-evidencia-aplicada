@@ -9,7 +9,6 @@
   <title>KineCheck Evidencia Aplicada</title>
   <link rel="stylesheet" href="styles.css?v=20260728-4">
   <script src="config.js?v=20260728-4" defer></script>
-  <script src="course-data.js?v=20260728-4" defer></script>
   <script src="progress-service.js?v=20260728-4" defer></script>
   <script src="app.js?v=20260728-4" defer></script>
   <script src="auth-gate.js?v=20260728-4" defer></script>
@@ -34,13 +33,30 @@
   </main>
 
   <div id="profile-shell" class="access-shell" hidden>
-    <section class="access-card profile-card"><span class="eyebrow">PERSONALIZA TU EXPERIENCIA</span><h1>¿Cómo utilizarás KineCheck?</h1><p>El contenido científico es el mismo; cambia la profundidad de las orientaciones y los casos destacados.</p><div class="profile-grid"><button class="profile-option" data-profile="student"><strong>Estudiante</strong><span>Aprender conceptos, interpretar evidencia y construir razonamiento.</span></button><button class="profile-option" data-profile="professional"><strong>Profesional</strong><span>Tomar decisiones, comunicar incertidumbre y aplicar evidencia en clínica.</span></button></div></section>
+    <section class="access-card profile-card">
+      <span class="eyebrow">PERSONALIZA TU EXPERIENCIA</span>
+      <h1>¿Cómo utilizarás KineCheck?</h1>
+      <p>El contenido científico es común, pero los apoyos, las preguntas y la transferencia clínica cambian según tu ruta.</p>
+      <div class="profile-grid">
+        <button class="profile-option" data-profile="student"><strong>Estudiante</strong><span>Glosarios, andamiaje conceptual, errores frecuentes y ejemplos guiados.</span></button>
+        <button class="profile-option" data-profile="professional"><strong>Profesional</strong><span>Aplicabilidad, comunicación, decisiones compartidas e implementación clínica.</span></button>
+      </div>
+    </section>
   </div>
 
   <div id="root" hidden>
-    <header class="topbar"><div class="brand"><div class="logo">KC</div><div><strong>KineCheck Evidencia Aplicada</strong><span id="profile-label">Ruta profesional</span></div></div><div class="top-actions"><div id="sync-status">Sincronizando…</div><div id="progress">Ruta personal 0%</div><button id="sign-out" class="link-button">Cerrar sesión</button></div></header>
-    <aside class="sidebar">
-      <button data-view="home" class="active">Inicio</button><button data-view="library">Biblioteca de evidencia</button><button data-view="notebook">Cuaderno clínico</button><div id="nav"></div><button data-view="integration">Laboratorio integrador</button>
+    <header class="topbar">
+      <div class="brand"><button id="mobile-menu" class="icon-button" aria-label="Abrir menú">☰</button><div class="logo">KC</div><div><strong>KineCheck Evidencia Aplicada</strong><span id="profile-label">Ruta profesional</span></div></div>
+      <div class="top-actions"><div id="sync-status">Sincronizando…</div><div id="progress">Ruta personal 0%</div><button id="change-profile" class="link-button">Cambiar perfil</button><button id="sign-out" class="link-button">Cerrar sesión</button></div>
+    </header>
+    <div id="nav-overlay" class="nav-overlay" hidden></div>
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-mobile-head"><strong>Contenido</strong><button id="close-menu" class="icon-button">×</button></div>
+      <button data-view="home" class="active">Inicio</button>
+      <button data-view="library">Biblioteca de evidencia</button>
+      <button data-view="notebook">Cuaderno clínico</button>
+      <div id="nav"></div>
+      <button data-view="integration">Laboratorio integrador</button>
       <div class="ecosystem"><span>ECOSISTEMA KINECHECK</span><a href="https://emmanuelkine.github.io/kinecheck-comunicacion-clinica/">Comunicación Clínica</a><a href="https://emmanuelkine.github.io/mas-alla-del-dolor/">Más allá del dolor</a><a href="https://emmanuelkine.github.io/">Volver a KineCheck</a></div>
     </aside>
     <main id="app"></main>
