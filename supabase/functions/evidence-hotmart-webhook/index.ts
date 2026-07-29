@@ -30,12 +30,31 @@ function toIso(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function isOlder(incoming: string | null, current: string | null): boolean {
-  if (!incoming || !current) return false;
-  const incomingTime = new Date(incoming).getTime();
-  const currentTime = new Date(current).getTime();
+function eventPriority(event: string | null | undefined): number {
+  if (!event) return 0;
+  if (REVOKE.has(event)) return 20;
+  if (APPROVE.has(event)) return 10;
+  return 0;
+}
+
+function isStaleEvent(
+  incomingDate: string | null,
+  currentDate: string | null,
+  incomingEvent: string,
+  currentEvent: string | null,
+): boolean {
+  if (!incomingDate || !currentDate) return false;
+
+  const incomingTime = new Date(incomingDate).getTime();
+  const currentTime = new Date(currentDate).getTime();
+
   if (Number.isNaN(incomingTime) || Number.isNaN(currentTime)) return false;
-  return incomingTime < currentTime;
+  if (incomingTime < currentTime) return true;
+  if (incomingTime > currentTime) return false;
+
+  // Si Hotmart envía varios estados con la misma marca temporal,
+  // un bloqueo nunca puede ser sobrescrito por una aprobación.
+  return eventPriority(incomingEvent) < eventPriority(currentEvent);
 }
 
 serve(async (req) => {
@@ -126,7 +145,12 @@ serve(async (req) => {
       return Response.json({ error: currentAccessError.message }, { status: 500 });
     }
 
-    staleEvent = isOlder(eventDate, currentAccess?.last_event_at || null);
+    staleEvent = isStaleEvent(
+      eventDate,
+      currentAccess?.last_event_at || null,
+      event,
+      currentAccess?.last_event || null,
+    );
 
     if (!staleEvent) {
       const purchaseDate = toIso(purchase.approved_date || purchase.order_date);
