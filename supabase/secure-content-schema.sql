@@ -33,6 +33,8 @@ alter table public.course_access add column if not exists purchase_date timestam
 alter table public.course_access add column if not exists warranty_date timestamptz;
 alter table public.course_access add column if not exists product_ucode text;
 alter table public.course_access add column if not exists access_source text not null default 'manual';
+alter table public.course_access add column if not exists last_event_at timestamptz;
+create index if not exists course_access_event_order_idx on public.course_access(course_slug, lower(email), last_event_at desc);
 
 create table if not exists public.hotmart_events (
   event_id text primary key,
@@ -40,6 +42,7 @@ create table if not exists public.hotmart_events (
   product_ucode text,
   buyer_email text,
   transaction_id text,
+  event_date timestamptz,
   payload jsonb not null,
   processed_at timestamptz not null default now()
 );
@@ -47,5 +50,7 @@ alter table public.hotmart_events enable row level security;
 create index if not exists hotmart_events_email_idx on public.hotmart_events(lower(buyer_email));
 
 comment on table public.course_content is 'Contenido privado del curso. No exponer por REST público.';
-comment on table public.evidence_library is 'Catálogo privado de los 91 contenidos de evidencia.';
+comment on table public.evidence_library is 'Catálogo privado de los contenidos de evidencia.';
 comment on table public.hotmart_events is 'Auditoría y deduplicación de webhooks Hotmart.';
+comment on column public.course_access.last_event_at is 'Fecha informada por Hotmart para evitar que eventos antiguos sobrescriban estados más recientes.';
+comment on column public.hotmart_events.event_date is 'Fecha del evento informada por Hotmart.';
