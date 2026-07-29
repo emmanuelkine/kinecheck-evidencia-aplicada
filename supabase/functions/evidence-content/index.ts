@@ -1,13 +1,46 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { AccessError, authorizeCourse } from "../_shared/course-access.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const COURSE_SLUG = "evidencia-aplicada";
+const DEFAULT_OWNER_EMAILS = [
+  "emmanuelkine@gmail.com",
+  "emmanuelkine+owner@gmail.com",
+  "emmanuel_fox@hotmail.com",
+];
+const DEFAULT_BETA_EMAILS = ["emmanuelkine+beta@gmail.com"];
+const DEFAULT_BETA_TRIAL_DAYS = 5;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Content-Type": "application/json",
   "Cache-Control": "private, no-store, max-age=0",
 };
+
+class AccessError extends Error {
+  status: number;
+
+  constructor(message: string, status = 500) {
+    super(message);
+    this.name = "AccessError";
+    this.status = status;
+  }
+}
+
+function normalizeEmail(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function configuredEmails(name: string, fallback: string[]): Set<string> {
+  const configured = Deno.env.get(name)?.trim();
+  const values = configured ? configured.split(",") : fallback;
+  return new Set(values.map(normalizeEmail).filter(Boolean));
+}
+
+function betaTrialDays(): number {
+  const value = Number(Deno.env.get("KINECHECK_BETA_TRIAL_DAYS") || DEFAULT_BETA_TRIAL_DAYS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_BETA_TRIAL_DAYS;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -19,20 +52,110 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const requestedSlug = String(body.courseSlug || "").trim();
-
-    if (requestedSlug !== COURSE_SLUG) {
-      return new Response(JSON.stringify({ message: "Curso no autorizado." }), {
-        status: 403,
-        headers: corsHeaders,
-      });
+    const authorization = req.headers.get("Authorization") || "";
+    if (!authorization.startsWith("Bearer ")) {
+      throw new AccessError("Falta la sesión de usuario.", 401);
     }
 
-    const { admin, access } = await authorizeCourse(
-      req.headers.get("Authorization") || "",
-      COURSE_SLUG,
-    );
+    const body = await req.json().catch(() => ({}));
+    const requestedSlug = String(body.courseSlug || "").trim();
+    if (requestedSlug !== COURSE_SLUG) {
+      throw new AccessError("Curso no autorizado.", 403);
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      throw new AccessError("La autorización del curso no está configurada.", 503);
+    }
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    const email = normalizeEmail(user?.email);
+    if (userError || !user || !email) {
+      throw new AccessError("La sesión no es válida o expiró.", 401);
+    }
+
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+    let access: {
+      active: true;
+      email: string;
+      courseSlug: string;
+      source: "owner" | "beta" | "course_access";
+      expiresAt: string | null;
+    } | null = null;
+
+    const ownerEmails = configuredEmails("KINECHECK_OWNER_EMAILS", DEFAULT_OWNER_EMAILS);
+    if (ownerEmails.has(email)) {
+      access = {
+        active: true,
+        email,
+        courseSlug: COURSE_SLUG,
+        source: "owner",
+        expiresAt: null,
+      };
+    }
+
+    let betaExpired = false;
+    if (!access) {
+      const betaEmails = configuredEmails("KINECHECK_BETA_EMAILS", DEFAULT_BETA_EMAILS);
+      if (betaEmails.has(email)) {
+        const createdAt = new Date(user.created_at || 0);
+        if (!Number.isNaN(createdAt.getTime())) {
+          const expiresAt = new Date(
+            createdAt.getTime() + betaTrialDays() * 24 * 60 * 60 * 1000,
+          );
+          if (expiresAt.getTime() > Date.now()) {
+            access = {
+              active: true,
+              email,
+              courseSlug: COURSE_SLUG,
+              source: "beta",
+              expiresAt: expiresAt.toISOString(),
+            };
+          } else {
+            betaExpired = true;
+          }
+        }
+      }
+    }
+
+    if (!access) {
+      const { data: license, error: licenseError } = await admin
+        .from("course_access")
+        .select("active")
+        .eq("email", email)
+        .eq("course_slug", COURSE_SLUG)
+        .maybeSingle();
+
+      if (licenseError) {
+        console.error("course_access error", licenseError);
+        throw new AccessError("No fue posible verificar la licencia del curso.", 500);
+      }
+
+      if (license?.active) {
+        access = {
+          active: true,
+          email,
+          courseSlug: COURSE_SLUG,
+          source: "course_access",
+          expiresAt: null,
+        };
+      }
+    }
+
+    if (!access) {
+      if (betaExpired) {
+        throw new AccessError(
+          "La prueba Beta terminó y no encontramos una compra activa asociada a este correo.",
+          403,
+        );
+      }
+      throw new AccessError("No encontramos una compra activa asociada a este correo.", 403);
+    }
 
     const { data: courseRow, error: courseError } = await admin
       .from("course_content")
@@ -42,17 +165,10 @@ serve(async (req) => {
       .maybeSingle();
 
     if (courseError) {
-      return new Response(JSON.stringify({ message: "No fue posible cargar el curso." }), {
-        status: 500,
-        headers: corsHeaders,
-      });
+      throw new AccessError("No fue posible cargar el curso.", 500);
     }
-
     if (!courseRow?.payload) {
-      return new Response(JSON.stringify({ message: "El contenido protegido aún no fue publicado." }), {
-        status: 503,
-        headers: corsHeaders,
-      });
+      throw new AccessError("El contenido protegido aún no fue publicado.", 503);
     }
 
     const { data: library, error: libraryError } = await admin
@@ -63,10 +179,7 @@ serve(async (req) => {
       .order("sort_order", { ascending: true });
 
     if (libraryError) {
-      return new Response(JSON.stringify({ message: "No fue posible cargar la biblioteca científica." }), {
-        status: 500,
-        headers: corsHeaders,
-      });
+      throw new AccessError("No fue posible cargar la biblioteca científica.", 500);
     }
 
     return new Response(JSON.stringify({
