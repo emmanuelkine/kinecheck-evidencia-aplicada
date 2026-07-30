@@ -73,24 +73,42 @@ function readSession() {
   }
 }
 
+async function validateIdentity(session) {
+  const user = await api("/auth/v1/user", {
+    method: "GET",
+    token: session.access_token,
+  });
+  const verified = { ...session, user };
+  saveSession(verified);
+  return verified;
+}
+
 async function validSession() {
   let session = readSession();
-  if (!session) return null;
+  if (!session?.access_token) return null;
 
-  if (Number(session.expires_at || 0) <= Math.floor(Date.now() / 1000) + 60) {
+  try {
+    if (Number(session.expires_at || 0) <= Math.floor(Date.now() / 1000) + 60) {
+      session = await api("/auth/v1/token?grant_type=refresh_token", {
+        method: "POST",
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      saveSession(session);
+    }
+    return await validateIdentity(session);
+  } catch {
     try {
       session = await api("/auth/v1/token?grant_type=refresh_token", {
         method: "POST",
         body: JSON.stringify({ refresh_token: session.refresh_token }),
       });
       saveSession(session);
+      return await validateIdentity(session);
     } catch {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
   }
-
-  return session;
 }
 
 function show(text, error = false) {
@@ -147,6 +165,13 @@ async function launch(session) {
   try {
     // Una sola llamada valida la licencia central y entrega el contenido protegido.
     const content = await loadProtectedContent(session);
+    if (!window.KineCheckWatermark) {
+      throw new Error("No fue posible activar la protección de uso personal.");
+    }
+    await window.KineCheckWatermark.showVerifiedBuyer({
+      user: session.user,
+      licenseScopes: [C.courseSlug],
+    });
 
     setBusy(true, "Cargando tu progreso y perfil…");
     window.KineCheckProgress.setSession(session);
@@ -174,6 +199,7 @@ async function launch(session) {
       openCourse(session, state, content);
     }
   } catch (error) {
+    window.KineCheckWatermark?.hide();
     setBusy(false);
     if (error.status === 401) localStorage.removeItem(SESSION_KEY);
     show(`${error.message} Si necesitas ayuda, escribe a ${C.supportEmail}.`, true);
@@ -205,7 +231,7 @@ form.onsubmit = async (event) => {
 
   try {
     setBusy(true, mode === "login" ? "Iniciando sesión…" : "Creando tu cuenta…");
-    const session = mode === "login"
+    let session = mode === "login"
       ? await api("/auth/v1/token?grant_type=password", {
           method: "POST",
           body: JSON.stringify({ email: normalizedEmail, password: enteredPassword }),
@@ -223,6 +249,7 @@ form.onsubmit = async (event) => {
     }
 
     saveSession(session);
+    session = await validateIdentity(session);
     await launch(session);
   } catch (error) {
     setBusy(false);
@@ -231,6 +258,7 @@ form.onsubmit = async (event) => {
 };
 
 $("#sign-out").onclick = () => {
+  window.KineCheckWatermark?.hide();
   localStorage.removeItem(SESSION_KEY);
   location.reload();
 };
