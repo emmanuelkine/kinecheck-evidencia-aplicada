@@ -4,6 +4,6 @@ window.KINECHECK_CONFIG=Object.freeze({
   courseSlug:'evidencia-aplicada',
   contentFunction:'evidence-content',
   progressTable:'learning_progress',
-  supportEmail:'emmanuelkine@gmail.com',
-  appVersion:'2026.07.28.5'
+  supportEmail:'soporte.kinecheck@gmail.com',
+  appVersion:'2026.07.31.6'
 });
