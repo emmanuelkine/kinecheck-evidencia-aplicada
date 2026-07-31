@@ -1,7 +1,8 @@
 {
-  "version": "2026-07-31.1",
+  "version": "2026-07-31.2",
   "lastReviewed": "2026-07-31",
-  "editorialNote": "Selección clínica verificada manualmente. Se incluyen únicamente referencias con utilidad práctica y una fuente primaria comprobable. Las alertas no sustituyen la lectura crítica del texto completo ni la evaluación individual del paciente.",
+  "contentClassification": "public-evidence-digest",
+  "editorialNote": "Síntesis editorial pública de estudios y guías enlazados a sus fuentes originales. No contiene datos de usuarios, información clínica individual ni material curricular protegido. La lectura crítica completa, las actividades formativas, las licencias y el progreso personal permanecen dentro del acceso autenticado de KineCheck.",
   "items": [
     {
       "id": "bfr-msk-2026",
