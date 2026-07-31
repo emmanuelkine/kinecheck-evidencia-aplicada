@@ -1,0 +1,68 @@
+name: Validar alertas de evidencia
+
+on:
+  pull_request:
+    paths:
+      - "weekly-alerts.js"
+      - "weekly-alerts.json"
+      - "index.html"
+      - ".github/workflows/validate-alerts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "weekly-alerts.js"
+      - "weekly-alerts.json"
+      - "index.html"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validar sintaxis JavaScript
+        run: node --check weekly-alerts.js
+
+      - name: Validar estructura editorial
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync('weekly-alerts.json', 'utf8'));
+          const required = [
+            'id', 'alertDate', 'source', 'status', 'title', 'citation',
+            'studyType', 'population', 'mainFinding', 'quality',
+            'clinicalImplication', 'teachingImplication', 'url'
+          ];
+          if (!Array.isArray(data.items) || data.items.length === 0) {
+            throw new Error('La lista de alertas está vacía.');
+          }
+          const ids = new Set();
+          for (const item of data.items) {
+            for (const field of required) {
+              if (!String(item[field] || '').trim()) {
+                throw new Error(`Falta ${field} en ${item.id || 'registro sin id'}.`);
+              }
+            }
+            if (ids.has(item.id)) throw new Error(`ID duplicado: ${item.id}`);
+            ids.add(item.id);
+            const url = new URL(item.url);
+            if (url.protocol !== 'https:') throw new Error(`URL insegura: ${item.url}`);
+          }
+          if (!Array.isArray(data.watchlist)) {
+            throw new Error('watchlist debe ser una lista.');
+          }
+          console.log(`Alertas verificadas estructuralmente: ${data.items.length}`);
+          NODE
+
+      - name: Confirmar integración en la interfaz
+        run: grep -q 'weekly-alerts.js' index.html
