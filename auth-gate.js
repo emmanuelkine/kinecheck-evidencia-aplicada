@@ -60,8 +60,8 @@ async function api(path, options = {}) {
 }
 
 function saveSession(session) {
-  session.expires_at = session.expires_at ||
-    Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600);
+  session.expires_at = session.expires_at
+    || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600);
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
@@ -71,6 +71,10 @@ function readSession() {
   } catch {
     return null;
   }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
 }
 
 async function validateIdentity(session) {
@@ -83,29 +87,46 @@ async function validateIdentity(session) {
   return verified;
 }
 
+async function refreshSession(session) {
+  if (!session?.refresh_token) throw new Error("Esta sesión temporal no se puede renovar desde el curso.");
+  const refreshed = await api("/auth/v1/token?grant_type=refresh_token", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: session.refresh_token }),
+  });
+  saveSession(refreshed);
+  return refreshed;
+}
+
 async function validSession() {
   let session = readSession();
   if (!session?.access_token) return null;
 
-  try {
-    if (Number(session.expires_at || 0) <= Math.floor(Date.now() / 1000) + 60) {
-      session = await api("/auth/v1/token?grant_type=refresh_token", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: session.refresh_token }),
-      });
-      saveSession(session);
+  const now = Math.floor(Date.now() / 1000);
+  if (Number(session.expires_at || 0) <= now + 30) {
+    if (!session.refresh_token) {
+      clearSession();
+      return null;
     }
+    try {
+      session = await refreshSession(session);
+    } catch {
+      clearSession();
+      return null;
+    }
+  }
+
+  try {
     return await validateIdentity(session);
   } catch {
+    if (!session.refresh_token) {
+      clearSession();
+      return null;
+    }
     try {
-      session = await api("/auth/v1/token?grant_type=refresh_token", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: session.refresh_token }),
-      });
-      saveSession(session);
+      session = await refreshSession(session);
       return await validateIdentity(session);
     } catch {
-      localStorage.removeItem(SESSION_KEY);
+      clearSession();
       return null;
     }
   }
@@ -163,7 +184,6 @@ function openCourse(session, state, content) {
 
 async function launch(session) {
   try {
-    // Una sola llamada valida la licencia central y entrega el contenido protegido.
     const content = await loadProtectedContent(session);
     if (!window.KineCheckWatermark) {
       throw new Error("No fue posible activar la protección de uso personal.");
@@ -201,7 +221,7 @@ async function launch(session) {
   } catch (error) {
     window.KineCheckWatermark?.hide();
     setBusy(false);
-    if (error.status === 401) localStorage.removeItem(SESSION_KEY);
+    if (error.status === 401) clearSession();
     show(`${error.message} Si necesitas ayuda, escribe a ${C.supportEmail}.`, true);
   }
 }
@@ -259,7 +279,7 @@ form.onsubmit = async (event) => {
 
 $("#sign-out").onclick = () => {
   window.KineCheckWatermark?.hide();
-  localStorage.removeItem(SESSION_KEY);
+  clearSession();
   location.reload();
 };
 
