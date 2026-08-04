@@ -1,5 +1,5 @@
 const C = window.KINECHECK_CONFIG || {};
-const SESSION_KEY = "kinecheck_secure_session_v1";
+const SESSION_KEY = "kinecheck_course_session_v1:evidencia-aplicada";
 const $ = (selector) => document.querySelector(selector);
 
 const shell = $("#access-shell");
@@ -13,6 +13,7 @@ const busy = $("#access-progress");
 const loginTab = $("#login-tab");
 const signupTab = $("#signup-tab");
 const submit = $("#auth-submit");
+const forgot = $("#forgot-password");
 
 let mode = "login";
 
@@ -238,6 +239,27 @@ function setMode(next) {
 loginTab.onclick = () => setMode("login");
 signupTab.onclick = () => setMode("signup");
 
+forgot?.addEventListener("click", async () => {
+  msg.hidden = true;
+  const normalizedEmail = email.value.trim().toLowerCase();
+  if (!normalizedEmail) {
+    show("Escribe primero el correo utilizado en tu compra.", true);
+    email.focus();
+    return;
+  }
+
+  try {
+    const redirectTo = location.href.split("#")[0];
+    await api(`/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: "POST",
+      body: JSON.stringify({ email: normalizedEmail }),
+    });
+    show("Te enviamos un enlace seguro para restablecer tu contraseña.");
+  } catch (error) {
+    show(error.message, true);
+  }
+});
+
 form.onsubmit = async (event) => {
   event.preventDefault();
   msg.hidden = true;
@@ -284,6 +306,12 @@ $("#sign-out").onclick = () => {
 };
 
 (async () => {
+  const previous = readSession();
+  const expiredTransfer = Boolean(previous?.handoff_access_only && previous?.access_token);
   const session = await validSession();
-  if (session) await launch(session);
+  if (session) {
+    await launch(session);
+  } else if (expiredTransfer) {
+    show("Tu acceso temporal al curso terminó. Vuelve a KineCheck y ábrelo nuevamente; no necesitas escribir otra vez tu correo y contraseña.", true);
+  }
 })();

@@ -1,0 +1,116 @@
+:root {
+  color-scheme: light;
+}
+
+.access-shell {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(45, 212, 191, 0.2), transparent 28%),
+    radial-gradient(circle at 88% 78%, rgba(99, 102, 241, 0.22), transparent 34%),
+    linear-gradient(145deg, #081221, #0d3142 56%, #101735);
+}
+
+.access-shell .access-card {
+  width: min(500px, 94vw);
+  padding: clamp(26px, 5vw, 42px);
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 28px;
+  background: rgba(8, 19, 35, 0.92);
+  color: #f8fafc;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.access-shell .access-brand {
+  margin-bottom: 38px;
+}
+
+.access-shell .logo {
+  background: linear-gradient(135deg, #5eead4, #60a5fa 62%, #8b5cf6);
+  color: #06111f;
+}
+
+.access-shell .brand span,
+.access-shell .access-card > p,
+.access-shell .access-card > small {
+  color: #aebfd6;
+}
+
+.access-shell .eyebrow {
+  color: #67e8df;
+  letter-spacing: 0.14em;
+}
+
+.access-shell .access-card h1 {
+  margin: 10px 0 8px;
+  color: #ffffff;
+  font-size: clamp(36px, 7vw, 50px);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+}
+
+.access-shell .auth-tabs {
+  background: #101d32;
+}
+
+.access-shell .auth-tab {
+  color: #9fb0c8;
+}
+
+.access-shell .auth-tab.active {
+  background: #273a5a;
+  color: #ffffff;
+}
+
+.access-shell .access-card label {
+  color: #dce7f5;
+}
+
+.access-shell .access-card input {
+  border-color: #344b68;
+  background: #09182a;
+  color: #ffffff;
+}
+
+.access-shell .access-card input:focus {
+  border-color: #67e8df;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(103, 232, 223, 0.14);
+}
+
+.access-shell .btn.full {
+  min-height: 52px;
+  margin-top: 16px;
+  background: linear-gradient(100deg, #55ded3, #6393ff);
+  color: #071022;
+}
+
+.text-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px;
+  border: 0;
+  background: transparent;
+  color: #8fe3dc;
+  font: inherit;
+  cursor: pointer;
+}
+
+.academy-return {
+  display: block;
+  margin-top: 14px;
+  color: #9fc4ef;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.access-shell .notice {
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  background: rgba(45, 212, 191, 0.1);
+  color: #dcfffb;
+}
+
+.access-shell .notice-error {
+  border-color: rgba(251, 113, 133, 0.42);
+  background: rgba(159, 18, 57, 0.22);
+  color: #ffe4e8;
+}
