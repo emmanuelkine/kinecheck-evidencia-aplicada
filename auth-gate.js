@@ -1,26 +1,31 @@
 const C = window.KINECHECK_CONFIG || {};
-const SESSION_KEY = "kinecheck_course_session_v1:evidencia-aplicada";
+const EXPECTED_COURSE = "evidencia-aplicada";
+const SESSION_KEY = "kinecheck_course_session_v2:evidencia-aplicada";
+const LEGACY_SESSION_KEY = "kinecheck_course_session_v1:evidencia-aplicada";
 const $ = (selector) => document.querySelector(selector);
 
 const shell = $("#access-shell");
 const profileShell = $("#profile-shell");
 const root = $("#root");
-const form = $("#auth-form");
-const email = $("#email");
-const password = $("#password");
 const msg = $("#auth-message");
 const busy = $("#access-progress");
-const loginTab = $("#login-tab");
-const signupTab = $("#signup-tab");
-const submit = $("#auth-submit");
-const forgot = $("#forgot-password");
+const ecosystemEntry = $("#ecosystem-entry");
+const signOut = $("#sign-out");
 
-let mode = "login";
+function configuredCorrectly() {
+  return Boolean(
+    C.supabaseUrl
+    && C.supabaseAnonKey
+    && C.contentFunction
+    && C.courseSlug === EXPECTED_COURSE,
+  );
+}
 
 function headers(token) {
   const result = {
     apikey: C.supabaseAnonKey,
     "Content-Type": "application/json",
+    "Cache-Control": "no-store",
   };
   if (token) result.Authorization = `Bearer ${token}`;
   return result;
@@ -30,7 +35,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 15000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeout);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, cache: "no-store", signal: controller.signal });
   } catch (error) {
     if (error?.name === "AbortError") {
       throw new Error("La conexión tardó demasiado. Intenta nuevamente.");
@@ -60,22 +65,53 @@ async function api(path, options = {}) {
   return data;
 }
 
-function saveSession(session) {
-  session.expires_at = session.expires_at
-    || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600);
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+function normalizeSession(value) {
+  if (!value?.access_token) return null;
+  const expiresAt = Number(value.expires_at || 0);
+  if (expiresAt && expiresAt <= Math.floor(Date.now() / 1000) + 15) return null;
+  if (value.product && value.product !== EXPECTED_COURSE) return null;
+  return {
+    access_token: String(value.access_token),
+    expires_at: expiresAt || null,
+    expires_in: Number(value.expires_in || 0) || null,
+    token_type: value.token_type || "bearer",
+    handoff_access_only: true,
+    product: EXPECTED_COURSE,
+  };
 }
 
-function readSession() {
+function readJson(storage, key) {
   try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    return normalizeSession(JSON.parse(storage.getItem(key) || "null"));
   } catch {
     return null;
   }
 }
 
 function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // Limpieza de mejor esfuerzo.
+  }
+}
+
+function readSession() {
+  const current = readJson(sessionStorage, SESSION_KEY);
+  if (current) return current;
+
+  const legacy = readJson(localStorage, LEGACY_SESSION_KEY);
+  if (!legacy) return null;
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(legacy));
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // La sesión sigue disponible durante esta carga.
+  }
+  return legacy;
 }
 
 async function validateIdentity(session) {
@@ -83,67 +119,34 @@ async function validateIdentity(session) {
     method: "GET",
     token: session.access_token,
   });
-  const verified = { ...session, user };
-  saveSession(verified);
-  return verified;
-}
-
-async function refreshSession(session) {
-  if (!session?.refresh_token) throw new Error("Esta sesión temporal no se puede renovar desde el curso.");
-  const refreshed = await api("/auth/v1/token?grant_type=refresh_token", {
-    method: "POST",
-    body: JSON.stringify({ refresh_token: session.refresh_token }),
-  });
-  saveSession(refreshed);
-  return refreshed;
-}
-
-async function validSession() {
-  let session = readSession();
-  if (!session?.access_token) return null;
-
-  const now = Math.floor(Date.now() / 1000);
-  if (Number(session.expires_at || 0) <= now + 30) {
-    if (!session.refresh_token) {
-      clearSession();
-      return null;
-    }
-    try {
-      session = await refreshSession(session);
-    } catch {
-      clearSession();
-      return null;
-    }
-  }
-
-  try {
-    return await validateIdentity(session);
-  } catch {
-    if (!session.refresh_token) {
-      clearSession();
-      return null;
-    }
-    try {
-      session = await refreshSession(session);
-      return await validateIdentity(session);
-    } catch {
-      clearSession();
-      return null;
-    }
-  }
+  return { ...session, user };
 }
 
 function show(text, error = false) {
+  if (!msg) return;
   msg.textContent = text;
   msg.className = error ? "notice notice-error" : "notice";
   msg.hidden = false;
 }
 
-function setBusy(value, text = "Verificando tu acceso…") {
-  form.hidden = value;
-  busy.hidden = !value;
-  const paragraph = busy.querySelector("p");
-  if (paragraph) paragraph.textContent = text;
+function setBusy(value, text = "Validando tu licencia de Evidencia Aplicada…") {
+  if (busy) {
+    busy.hidden = !value;
+    const paragraph = busy.querySelector("p");
+    if (paragraph) paragraph.textContent = text;
+  }
+}
+
+function showEcosystemEntry(text = "Inicia sesión una sola vez en KineCheck y abre este curso desde tu biblioteca.") {
+  setBusy(false);
+  if (ecosystemEntry) {
+    const copy = ecosystemEntry.querySelector("p");
+    if (copy) copy.textContent = text;
+    ecosystemEntry.hidden = false;
+  }
+  if (shell) shell.hidden = false;
+  if (profileShell) profileShell.hidden = true;
+  if (root) root.hidden = true;
 }
 
 async function invokeFunction(name, session, body = {}) {
@@ -166,12 +169,15 @@ async function invokeFunction(name, session, body = {}) {
 }
 
 async function loadProtectedContent(session) {
-  setBusy(true, "Validando tu acceso y cargando el contenido protegido…");
+  setBusy(true);
   const data = await invokeFunction(C.contentFunction, session, {
-    courseSlug: C.courseSlug,
+    courseSlug: EXPECTED_COURSE,
   });
   if (!data?.course?.modules?.length) {
     throw new Error("El contenido protegido aún no fue publicado en Supabase.");
+  }
+  if (data?.access?.courseSlug && data.access.courseSlug !== EXPECTED_COURSE) {
+    throw new Error("La autorización recibida no corresponde a Evidencia Aplicada.");
   }
   return data;
 }
@@ -191,7 +197,7 @@ async function launch(session) {
     }
     await window.KineCheckWatermark.showVerifiedBuyer({
       user: session.user,
-      licenseScopes: [C.courseSlug],
+      licenseScopes: [EXPECTED_COURSE],
     });
 
     setBusy(true, "Cargando tu progreso y perfil…");
@@ -221,97 +227,48 @@ async function launch(session) {
     }
   } catch (error) {
     window.KineCheckWatermark?.hide();
+    clearSession();
     setBusy(false);
-    if (error.status === 401) clearSession();
-    show(`${error.message} Si necesitas ayuda, escribe a ${C.supportEmail}.`, true);
+    const denied = error.status === 403;
+    show(
+      denied
+        ? `${error.message} Solo se habilita el producto comprado por esta cuenta.`
+        : `${error.message} Vuelve a KineCheck y abre el curso nuevamente.`,
+      true,
+    );
+    showEcosystemEntry(
+      denied
+        ? "Esta cuenta no tiene una licencia activa de Evidencia Aplicada. Regresa a tu biblioteca para abrir únicamente tus productos disponibles."
+        : "La sesión terminó. Regresa a KineCheck, inicia sesión una vez y vuelve a abrir el curso.",
+    );
   }
 }
 
-function setMode(next) {
-  mode = next;
-  loginTab.classList.toggle("active", mode === "login");
-  signupTab.classList.toggle("active", mode === "signup");
-  submit.textContent = mode === "login" ? "Ingresar al curso" : "Crear mi cuenta";
-  password.autocomplete = mode === "login" ? "current-password" : "new-password";
-  msg.hidden = true;
-}
-
-loginTab.onclick = () => setMode("login");
-signupTab.onclick = () => setMode("signup");
-
-forgot?.addEventListener("click", async () => {
-  msg.hidden = true;
-  const normalizedEmail = email.value.trim().toLowerCase();
-  if (!normalizedEmail) {
-    show("Escribe primero el correo utilizado en tu compra.", true);
-    email.focus();
-    return;
-  }
-
-  try {
-    const redirectTo = location.href.split("#")[0];
-    await api(`/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
-      method: "POST",
-      body: JSON.stringify({ email: normalizedEmail }),
-    });
-    show("Te enviamos un enlace seguro para restablecer tu contraseña.");
-  } catch (error) {
-    show(error.message, true);
-  }
-});
-
-form.onsubmit = async (event) => {
-  event.preventDefault();
-  msg.hidden = true;
-
-  const normalizedEmail = email.value.trim().toLowerCase();
-  const enteredPassword = password.value;
-  if (!normalizedEmail || enteredPassword.length < 8) {
-    show("Ingresa un correo válido y una contraseña de al menos 8 caracteres.", true);
-    return;
-  }
-
-  try {
-    setBusy(true, mode === "login" ? "Iniciando sesión…" : "Creando tu cuenta…");
-    let session = mode === "login"
-      ? await api("/auth/v1/token?grant_type=password", {
-          method: "POST",
-          body: JSON.stringify({ email: normalizedEmail, password: enteredPassword }),
-        })
-      : await api("/auth/v1/signup", {
-          method: "POST",
-          body: JSON.stringify({ email: normalizedEmail, password: enteredPassword }),
-        });
-
-    if (!session.access_token) {
-      setBusy(false);
-      setMode("login");
-      show("Cuenta creada. Revisa tu correo y confirma la dirección antes de ingresar.");
-      return;
-    }
-
-    saveSession(session);
-    session = await validateIdentity(session);
-    await launch(session);
-  } catch (error) {
-    setBusy(false);
-    show(error.message, true);
-  }
-};
-
-$("#sign-out").onclick = () => {
+signOut?.addEventListener("click", () => {
   window.KineCheckWatermark?.hide();
   clearSession();
-  location.reload();
-};
+  location.replace("https://kinecheck.cl/academy/#biblioteca");
+});
 
 (async () => {
-  const previous = readSession();
-  const expiredTransfer = Boolean(previous?.handoff_access_only && previous?.access_token);
-  const session = await validSession();
-  if (session) {
+  if (!configuredCorrectly()) {
+    show("La configuración de acceso no coincide con Evidencia Aplicada.", true);
+    showEcosystemEntry();
+    return;
+  }
+
+  const rawSession = readSession();
+  if (!rawSession) {
+    showEcosystemEntry();
+    return;
+  }
+
+  try {
+    const session = await validateIdentity(rawSession);
     await launch(session);
-  } else if (expiredTransfer) {
-    show("Tu acceso temporal al curso terminó. Vuelve a KineCheck y ábrelo nuevamente; no necesitas escribir otra vez tu correo y contraseña.", true);
+  } catch (error) {
+    clearSession();
+    show(`${error.message} Regresa a KineCheck e inicia sesión nuevamente.`, true);
+    showEcosystemEntry();
   }
 })();
