@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "weekly-alerts.js"
+      - "weekly-alerts-professional.js"
       - "weekly-alerts.json"
       - "index.html"
       - ".github/workflows/validate-alerts.yml"
@@ -12,6 +13,7 @@ on:
       - main
     paths:
       - "weekly-alerts.js"
+      - "weekly-alerts-professional.js"
       - "weekly-alerts.json"
       - "index.html"
       - ".github/workflows/validate-alerts.yml"
@@ -32,7 +34,9 @@ jobs:
           node-version: "22"
 
       - name: Validar sintaxis JavaScript
-        run: node --check weekly-alerts.js
+        run: |
+          node --check weekly-alerts.js
+          node --check weekly-alerts-professional.js
 
       - name: Validar estructura y clasificación editorial
         run: |
@@ -81,4 +85,10 @@ jobs:
           NODE
 
       - name: Confirmar integración en la interfaz
-        run: grep -q 'weekly-alerts.js' index.html
+        run: |
+          grep -q 'weekly-alerts.js' index.html
+          grep -q 'weekly-alerts-professional.js' index.html
+          grep -q '.weekly-card h2' weekly-alerts-professional.js
+          grep -q 'color: #ffffff !important' weekly-alerts-professional.js
+          grep -q '.weekly-implication p' weekly-alerts-professional.js
+          grep -q '.weekly-reference' weekly-alerts-professional.js
