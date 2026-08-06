@@ -1,281 +1,193 @@
 (() => {
   "use strict";
 
-  if (window.__KINECHECK_WEEKLY_PROFESSIONAL_STYLE__) return;
-  window.__KINECHECK_WEEKLY_PROFESSIONAL_STYLE__ = true;
+  if (window.__KINECHECK_WEEKLY_TITLE_FIX_V2__) return;
+  window.__KINECHECK_WEEKLY_TITLE_FIX_V2__ = true;
 
-  function installProfessionalStyles() {
-    if (document.getElementById("weekly-alerts-professional-styles")) return;
+  const STYLE_ID = "weekly-alerts-professional-styles-v2";
+
+  function installStyles() {
+    if (document.getElementById(STYLE_ID)) return;
 
     const style = document.createElement("style");
-    style.id = "weekly-alerts-professional-styles";
+    style.id = STYLE_ID;
     style.textContent = `
-      .weekly-evidence-head {
-        gap: 1.15rem;
-        margin-bottom: 1.5rem;
+      html body #root #app .weekly-evidence-head h1 {
+        color: #071a33 !important;
+        font-size: clamp(2.25rem, 4vw, 3.65rem) !important;
+        line-height: 1.03 !important;
+        letter-spacing: -0.045em !important;
+        font-weight: 900 !important;
       }
 
-      .weekly-evidence-head > div:first-child {
-        padding: 1.25rem 1.35rem;
-        border: 1px solid rgba(74, 222, 200, 0.18);
-        border-radius: 20px;
-        background:
-          radial-gradient(circle at 94% 10%, rgba(72, 190, 255, 0.13), transparent 31%),
-          linear-gradient(145deg, rgba(11, 43, 63, 0.98), rgba(8, 31, 49, 0.96));
-        box-shadow: 0 18px 45px rgba(0, 16, 29, 0.18);
+      html body #root #app .weekly-card {
+        position: relative !important;
+        overflow: hidden !important;
+        padding: clamp(1.15rem, 2vw, 1.65rem) !important;
+        border: 1px solid rgba(112, 198, 231, 0.26) !important;
+        border-radius: 22px !important;
+        background: linear-gradient(160deg, #0b2d43 0%, #092234 100%) !important;
+        box-shadow: 0 20px 46px rgba(0, 12, 24, 0.28) !important;
       }
 
-      .weekly-evidence-head h1 {
-        margin: 0.75rem 0 0.55rem;
-        color: #f8fcff !important;
-        font-size: clamp(2rem, 3.6vw, 3.35rem);
-        line-height: 1.04;
-        letter-spacing: -0.035em;
-        font-weight: 850;
-        text-wrap: balance;
+      html body #root #app .weekly-card::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 auto 0 0 !important;
+        width: 5px !important;
+        background: linear-gradient(180deg, #38e0c6, #68a9ff) !important;
       }
 
-      .weekly-evidence-head > div:first-child > p {
-        max-width: 920px;
-        margin: 0;
-        color: #c9dbe7 !important;
-        font-size: clamp(1rem, 1.45vw, 1.18rem);
-        line-height: 1.65;
+      html body #root #app .weekly-card .weekly-card-top,
+      html body #root #app .weekly-card .weekly-card-top > div {
+        width: 100% !important;
       }
 
-      .weekly-editorial-note {
-        color: #dcebf2 !important;
-        background: linear-gradient(135deg, rgba(47, 207, 179, 0.11), rgba(43, 125, 176, 0.08));
-        border-color: rgba(78, 220, 195, 0.3);
-        box-shadow: inset 3px 0 0 #3edbc0;
+      html body #root #app .weekly-card .weekly-card-top > div {
+        box-sizing: border-box !important;
+        margin-bottom: 0.85rem !important;
+        padding: 1rem 1.15rem 1.1rem !important;
+        border: 1px solid rgba(120, 211, 239, 0.2) !important;
+        border-radius: 18px !important;
+        background: linear-gradient(145deg, rgba(4, 22, 35, 0.96), rgba(13, 50, 70, 0.93)) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 28px rgba(0,0,0,0.15) !important;
       }
 
-      .weekly-editorial-note strong {
-        color: #f5fffd !important;
-      }
-
-      .weekly-card {
-        position: relative;
-        overflow: hidden;
-        padding: clamp(1.15rem, 2vw, 1.65rem);
-        border: 1px solid rgba(125, 191, 220, 0.23);
-        border-radius: 22px;
-        background:
-          radial-gradient(circle at 100% 0%, rgba(52, 177, 220, 0.11), transparent 30%),
-          linear-gradient(160deg, rgba(12, 43, 62, 0.99), rgba(10, 32, 49, 0.98));
-        box-shadow: 0 18px 42px rgba(0, 14, 27, 0.22);
-      }
-
-      .weekly-card::before {
-        content: "";
-        position: absolute;
-        inset: 0 auto 0 0;
-        width: 4px;
-        background: linear-gradient(180deg, #45e0ca, #5fa8ff);
-      }
-
-      .weekly-card.is-read {
-        opacity: 0.9;
-      }
-
-      .weekly-card-top,
-      .weekly-card-top > div {
-        width: 100%;
-      }
-
-      .weekly-card h2 {
-        max-width: 1050px;
-        margin: 0.8rem 0 0.65rem;
+      html body #root #app .weekly-card .weekly-card-top h2 {
+        display: block !important;
+        max-width: 1080px !important;
+        margin: 0.85rem 0 0.7rem !important;
+        padding: 0 !important;
         color: #ffffff !important;
-        font-size: clamp(1.65rem, 2.55vw, 2.45rem);
-        line-height: 1.12;
-        letter-spacing: -0.025em;
-        font-weight: 850;
-        text-wrap: balance;
-        text-shadow: 0 2px 18px rgba(0, 0, 0, 0.2);
+        -webkit-text-fill-color: #ffffff !important;
+        opacity: 1 !important;
+        filter: none !important;
+        font-size: clamp(2rem, 3.3vw, 3.05rem) !important;
+        line-height: 1.05 !important;
+        letter-spacing: -0.04em !important;
+        font-weight: 900 !important;
+        text-wrap: balance !important;
+        text-shadow: 0 3px 18px rgba(0,0,0,0.48) !important;
       }
 
-      .weekly-reference {
-        max-width: 1120px;
-        margin: 0.3rem 0 1rem;
-        padding: 0.8rem 1rem;
-        border-left: 3px solid rgba(91, 192, 255, 0.58);
-        border-radius: 0 12px 12px 0;
-        background: rgba(5, 24, 38, 0.42);
-        color: #c5d8e5 !important;
-        font-size: 0.97rem;
-        line-height: 1.62;
+      html body #root #app .weekly-card .weekly-reference {
+        max-width: 1120px !important;
+        margin: 0.25rem 0 0 !important;
+        padding: 0.8rem 0.95rem !important;
+        border-left: 3px solid #63bdf2 !important;
+        border-radius: 0 12px 12px 0 !important;
+        background: rgba(2, 15, 25, 0.5) !important;
+        color: #d8e8f2 !important;
+        -webkit-text-fill-color: #d8e8f2 !important;
+        font-size: 0.98rem !important;
+        line-height: 1.62 !important;
       }
 
-      .weekly-chip-row {
-        gap: 0.5rem;
-        margin: 0.7rem 0;
+      html body #root #app .weekly-card .weekly-chip {
+        color: #e1f0f7 !important;
+        -webkit-text-fill-color: #e1f0f7 !important;
+        background: rgba(4, 22, 35, 0.48) !important;
       }
 
-      .weekly-chip {
-        min-height: 30px;
-        padding: 0.34rem 0.68rem;
-        border-color: rgba(137, 190, 216, 0.3);
-        background: rgba(6, 27, 42, 0.38);
-        color: #dcebf3 !important;
-        font-size: 0.78rem;
-        font-weight: 620;
+      html body #root #app .weekly-card .weekly-chip.verified {
+        color: #77f2da !important;
+        -webkit-text-fill-color: #77f2da !important;
+        border-color: rgba(69, 224, 202, 0.55) !important;
+        background: rgba(43, 187, 164, 0.12) !important;
       }
 
-      .weekly-chip.verified {
-        border-color: rgba(69, 224, 202, 0.5);
-        background: rgba(43, 187, 164, 0.12);
-        color: #72f0d8 !important;
+      html body #root #app .weekly-card .weekly-field {
+        border: 1px solid rgba(131, 188, 216, 0.14) !important;
+        background: rgba(255, 255, 255, 0.055) !important;
       }
 
-      .weekly-grid {
-        gap: 0.9rem;
-        margin: 1.15rem 0;
-      }
-
-      .weekly-field {
-        min-height: 138px;
-        padding: 1.05rem 1.1rem;
-        border: 1px solid rgba(121, 174, 204, 0.13);
-        border-radius: 16px;
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
-      }
-
-      .weekly-field strong {
-        margin-bottom: 0.55rem;
+      html body #root #app .weekly-card .weekly-field strong,
+      html body #root #app .weekly-card .weekly-implication strong {
         color: #ffffff !important;
-        font-size: 1.02rem;
-        letter-spacing: -0.01em;
+        -webkit-text-fill-color: #ffffff !important;
+        opacity: 1 !important;
+        font-weight: 850 !important;
       }
 
-      .weekly-field p {
-        color: #d5e3eb !important;
-        font-size: 0.98rem;
-        line-height: 1.66;
+      html body #root #app .weekly-card .weekly-field p,
+      html body #root #app .weekly-card .weekly-implication p {
+        color: #e0edf3 !important;
+        -webkit-text-fill-color: #e0edf3 !important;
+        opacity: 1 !important;
+        line-height: 1.66 !important;
       }
 
-      .weekly-implications {
-        gap: 0.9rem;
+      html body #root #app .weekly-card .weekly-implication {
+        border: 1px solid rgba(63, 221, 194, 0.38) !important;
+        background: linear-gradient(145deg, rgba(22, 117, 108, 0.34), rgba(8, 49, 52, 0.54)) !important;
       }
 
-      .weekly-implication {
-        min-height: 174px;
-        padding: 1.15rem 1.2rem;
-        border: 1px solid rgba(63, 221, 194, 0.32);
-        border-radius: 17px;
-        background: linear-gradient(145deg, rgba(33, 161, 142, 0.15), rgba(14, 70, 69, 0.17));
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      html body #root #app .weekly-card .weekly-implication.teaching {
+        border-color: rgba(91, 166, 255, 0.4) !important;
+        background: linear-gradient(145deg, rgba(42, 91, 159, 0.35), rgba(14, 41, 76, 0.56)) !important;
       }
 
-      .weekly-implication.teaching {
-        border-color: rgba(91, 166, 255, 0.32);
-        background: linear-gradient(145deg, rgba(62, 120, 211, 0.15), rgba(24, 58, 104, 0.19));
+      html body #root #app .weekly-actions button {
+        color: #f3fbff !important;
+        -webkit-text-fill-color: #f3fbff !important;
       }
 
-      .weekly-implication strong {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.62rem;
-        color: #ffffff !important;
-        font-size: 1.08rem;
-        font-weight: 800;
-      }
-
-      .weekly-implication strong::before {
-        content: "C";
-        display: inline-grid;
-        place-items: center;
-        width: 25px;
-        height: 25px;
-        border-radius: 8px;
-        background: rgba(68, 225, 198, 0.17);
-        color: #6ff0d8;
-        font-size: 0.75rem;
-      }
-
-      .weekly-implication.teaching strong::before {
-        content: "D";
-        background: rgba(89, 161, 255, 0.18);
-        color: #8cc1ff;
-      }
-
-      .weekly-implication p {
-        margin: 0;
-        color: #dce9ef !important;
-        font-size: 0.98rem;
-        line-height: 1.68;
-      }
-
-      .weekly-actions {
-        gap: 0.7rem;
-        margin-top: 1.2rem;
-        padding-top: 1rem;
-        border-top: 1px solid rgba(139, 184, 208, 0.13);
-      }
-
-      .weekly-actions button,
-      .weekly-source-link {
-        min-height: 46px;
-        padding: 0.72rem 1rem;
-        border-radius: 12px;
-        font-weight: 720;
-        transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-      }
-
-      .weekly-actions button {
-        background: rgba(8, 30, 46, 0.48);
-        color: #edf8fc !important;
-      }
-
-      .weekly-actions button:hover,
-      .weekly-source-link:hover {
-        transform: translateY(-1px);
-      }
-
-      .weekly-source-link {
-        border-color: transparent;
-        background: linear-gradient(100deg, #35d4bd, #5aa5ff);
-        color: #041f2d !important;
-        box-shadow: 0 8px 22px rgba(53, 196, 194, 0.18);
-      }
-
-      .weekly-watch,
-      .weekly-watch h2,
-      .weekly-watch strong,
-      .weekly-watch p {
-        color: #eef8fc !important;
+      html body #root #app .weekly-source-link {
+        color: #032334 !important;
+        -webkit-text-fill-color: #032334 !important;
+        background: linear-gradient(100deg, #35d4bd, #64a7ff) !important;
+        font-weight: 850 !important;
       }
 
       @media (max-width: 820px) {
-        .weekly-evidence-head > div:first-child {
-          padding: 1.05rem;
+        html body #root #app .weekly-card .weekly-card-top h2 {
+          font-size: clamp(1.75rem, 8vw, 2.35rem) !important;
         }
 
-        .weekly-card {
-          padding: 1.05rem;
-          border-radius: 18px;
-        }
-
-        .weekly-field,
-        .weekly-implication {
-          min-height: auto;
-        }
-
-        .weekly-actions > * {
-          width: 100%;
-          justify-content: center;
-          text-align: center;
+        html body #root #app .weekly-card .weekly-card-top > div {
+          padding: 0.9rem !important;
         }
       }
     `;
-
     document.head.appendChild(style);
   }
 
+  function forceReadableElements(root = document) {
+    root.querySelectorAll?.(".weekly-card .weekly-card-top h2").forEach((title) => {
+      title.style.setProperty("color", "#ffffff", "important");
+      title.style.setProperty("-webkit-text-fill-color", "#ffffff", "important");
+      title.style.setProperty("opacity", "1", "important");
+      title.style.setProperty("font-weight", "900", "important");
+      title.style.setProperty("text-shadow", "0 3px 18px rgba(0,0,0,.48)", "important");
+    });
+
+    root.querySelectorAll?.(".weekly-implication strong, .weekly-implication p").forEach((element) => {
+      element.style.setProperty("color", element.matches("strong") ? "#ffffff" : "#e0edf3", "important");
+      element.style.setProperty("-webkit-text-fill-color", element.matches("strong") ? "#ffffff" : "#e0edf3", "important");
+      element.style.setProperty("opacity", "1", "important");
+    });
+  }
+
+  function initialize() {
+    installStyles();
+    forceReadableElements();
+
+    const app = document.getElementById("app");
+    if (!app) return;
+
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) forceReadableElements(node);
+        });
+      }
+      forceReadableElements(app);
+    }).observe(app, { childList: true, subtree: true });
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", installProfessionalStyles, { once: true });
+    document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {
-    installProfessionalStyles();
+    initialize();
   }
 })();
