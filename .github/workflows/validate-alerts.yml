@@ -84,11 +84,13 @@ jobs:
           console.log(`Alertas verificadas y clasificadas: ${data.items.length}`);
           NODE
 
-      - name: Confirmar integración en la interfaz
+      - name: Confirmar integración y contraste en la interfaz
         run: |
           grep -q 'weekly-alerts.js' index.html
           grep -q 'weekly-alerts-professional.js' index.html
-          grep -q '.weekly-card h2' weekly-alerts-professional.js
+          grep -q 'weekly-card .weekly-card-top h2' weekly-alerts-professional.js
           grep -q 'color: #ffffff !important' weekly-alerts-professional.js
-          grep -q '.weekly-implication p' weekly-alerts-professional.js
-          grep -q '.weekly-reference' weekly-alerts-professional.js
+          grep -q -- '-webkit-text-fill-color: #ffffff' weekly-alerts-professional.js
+          grep -q 'MutationObserver' weekly-alerts-professional.js
+          grep -q 'weekly-implication p' weekly-alerts-professional.js
+          grep -q 'weekly-reference' weekly-alerts-professional.js
