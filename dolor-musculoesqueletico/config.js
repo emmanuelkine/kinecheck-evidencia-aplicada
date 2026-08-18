@@ -1,0 +1,9 @@
+window.KINECHECK_CONFIG=Object.freeze({
+  supabaseUrl:'https://eqhcdclyeoapmqtlduwf.supabase.co',
+  supabaseAnonKey:'sb_publishable_FTwhDZYCF3zf7W9rB7bFwQ_rF9Y7OX_',
+  courseSlug:'dolor-musculoesqueletico',
+  contentFunction:'pain-content',
+  progressTable:'learning_progress',
+  supportEmail:'soporte.kinecheck@gmail.com',
+  appVersion:'2026.08.18.1'
+});
