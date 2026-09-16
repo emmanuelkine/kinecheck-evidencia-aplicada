@@ -1,7 +1,11 @@
 (() => {
-  const DATA_URL = "./weekly-alerts.json?v=20260731-1";
   const STORAGE_KEY = "kinecheck_weekly_evidence_state_v1";
   const NAV_ID = "weekly-alerts-nav";
+  const COURSE_SLUG = "evidencia-aplicada";
+  const SESSION_KEYS = [
+    [sessionStorage, "kinecheck_course_session_v2:evidencia-aplicada"],
+    [localStorage, "kinecheck_course_session_v1:evidencia-aplicada"],
+  ];
   let dataset = null;
 
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -11,6 +15,16 @@
     '"': "&quot;",
     "'": "&#39;",
   })[character]);
+
+  function readCourseToken() {
+    for (const [storage, key] of SESSION_KEYS) {
+      try {
+        const value = JSON.parse(storage.getItem(key) || "null");
+        if (value?.access_token) return String(value.access_token);
+      } catch { /* continuar */ }
+    }
+    return "";
+  }
 
   function readState() {
     try {
@@ -93,9 +107,27 @@
 
   async function loadDataset() {
     if (dataset) return dataset;
-    const response = await fetch(DATA_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error("No fue posible cargar las alertas semanales.");
-    dataset = await response.json();
+    const config = window.KINECHECK_CONFIG || {};
+    const token = readCourseToken();
+    if (!token || !config.supabaseUrl || !config.supabaseAnonKey || !config.contentFunction) {
+      throw new Error("La sesión protegida de Evidencia Aplicada no está disponible.");
+    }
+    const response = await fetch(`${config.supabaseUrl}/functions/v1/${config.contentFunction}`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        apikey: config.supabaseAnonKey,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ courseSlug: COURSE_SLUG }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "No fue posible cargar las alertas protegidas.");
+    if (!data?.weeklyEvidence || !Array.isArray(data.weeklyEvidence.items)) {
+      throw new Error("Las alertas protegidas aún no fueron publicadas.");
+    }
+    dataset = data.weeklyEvidence;
     return dataset;
   }
 
@@ -204,9 +236,9 @@
       app.innerHTML = `
         <div class="weekly-evidence-head">
           <div>
-            <span class="badge">ACTUALIZACIÓN CONTINUA</span>
+            <span class="badge">CONTENIDO PREMIUM · ACTUALIZACIÓN CONTINUA</span>
             <h1>Alertas semanales de evidencia</h1>
-            <p>PubMed, PEDro y vigilancia de guías clínicas, traducidos a decisiones clínicas y oportunidades docentes.</p>
+            <p>PubMed, PEDro y guías clínicas traducidos a decisiones clínicas y oportunidades docentes. Este análisis se entrega únicamente tras validar el acceso a Evidencia Aplicada.</p>
           </div>
           <div class="weekly-evidence-meta">
             <span class="weekly-chip verified">${dataset.items.length} referencias verificadas</span>
