@@ -19,7 +19,6 @@ const corsHeaders = {
 
 class AccessError extends Error {
   status: number;
-
   constructor(message: string, status = 500) {
     super(message);
     this.name = "AccessError";
@@ -42,6 +41,16 @@ function betaTrialDays(): number {
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_BETA_TRIAL_DAYS;
 }
 
+function usableLicense(license: any): boolean {
+  if (!license?.active) return false;
+  const owner = String(license.access_source || "").toLowerCase() === "owner"
+    || String(license.last_event || "").toUpperCase() === "OWNER_ACCESS";
+  if (owner) return true;
+  if (!license.access_expires_at) return true;
+  const time = new Date(license.access_expires_at).getTime();
+  return Number.isFinite(time) && time > Date.now();
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
@@ -58,8 +67,7 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const requestedSlug = String(body.courseSlug || "").trim();
-    if (requestedSlug !== COURSE_SLUG) {
+    if (String(body.courseSlug || "").trim() !== COURSE_SLUG) {
       throw new AccessError("Curso no autorizado.", 403);
     }
 
@@ -80,45 +88,21 @@ serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    let access: {
-      active: true;
-      email: string;
-      courseSlug: string;
-      source: "owner" | "beta" | "course_access";
-      expiresAt: string | null;
-    } | null = null;
+    let access: any = null;
 
-    const ownerEmails = configuredEmails("KINECHECK_OWNER_EMAILS", DEFAULT_OWNER_EMAILS);
-    if (ownerEmails.has(email)) {
-      access = {
-        active: true,
-        email,
-        courseSlug: COURSE_SLUG,
-        source: "owner",
-        expiresAt: null,
-      };
+    if (configuredEmails("KINECHECK_OWNER_EMAILS", DEFAULT_OWNER_EMAILS).has(email)) {
+      access = { active: true, email, courseSlug: COURSE_SLUG, source: "owner", expiresAt: null };
     }
 
     let betaExpired = false;
-    if (!access) {
-      const betaEmails = configuredEmails("KINECHECK_BETA_EMAILS", DEFAULT_BETA_EMAILS);
-      if (betaEmails.has(email)) {
-        const createdAt = new Date(user.created_at || 0);
-        if (!Number.isNaN(createdAt.getTime())) {
-          const expiresAt = new Date(
-            createdAt.getTime() + betaTrialDays() * 24 * 60 * 60 * 1000,
-          );
-          if (expiresAt.getTime() > Date.now()) {
-            access = {
-              active: true,
-              email,
-              courseSlug: COURSE_SLUG,
-              source: "beta",
-              expiresAt: expiresAt.toISOString(),
-            };
-          } else {
-            betaExpired = true;
-          }
+    if (!access && configuredEmails("KINECHECK_BETA_EMAILS", DEFAULT_BETA_EMAILS).has(email)) {
+      const createdAt = new Date(user.created_at || 0);
+      if (!Number.isNaN(createdAt.getTime())) {
+        const expiresAt = new Date(createdAt.getTime() + betaTrialDays() * 24 * 60 * 60 * 1000);
+        if (expiresAt.getTime() > Date.now()) {
+          access = { active: true, email, courseSlug: COURSE_SLUG, source: "beta", expiresAt: expiresAt.toISOString() };
+        } else {
+          betaExpired = true;
         }
       }
     }
@@ -126,33 +110,30 @@ serve(async (req) => {
     if (!access) {
       const { data: license, error: licenseError } = await admin
         .from("course_access")
-        .select("active")
+        .select("active,access_expires_at,access_source,last_event")
         .eq("email", email)
         .eq("course_slug", COURSE_SLUG)
         .maybeSingle();
-
-      if (licenseError) {
-        console.error("course_access error", licenseError);
-        throw new AccessError("No fue posible verificar la licencia del curso.", 500);
-      }
-
-      if (license?.active) {
+      if (licenseError) throw new AccessError("No fue posible verificar la licencia del curso.", 500);
+      if (usableLicense(license)) {
         access = {
           active: true,
           email,
           courseSlug: COURSE_SLUG,
           source: "course_access",
-          expiresAt: null,
+          expiresAt: license?.access_expires_at || null,
         };
+      } else if (license?.active && license?.access_expires_at) {
+        const time = new Date(license.access_expires_at).getTime();
+        if (Number.isFinite(time) && time <= Date.now()) {
+          throw new AccessError("El período de acceso de este producto finalizó.", 403);
+        }
       }
     }
 
     if (!access) {
       if (betaExpired) {
-        throw new AccessError(
-          "La prueba Beta terminó y no encontramos una compra activa asociada a este correo.",
-          403,
-        );
+        throw new AccessError("La prueba Beta terminó y no encontramos una compra activa asociada a este correo.", 403);
       }
       throw new AccessError("No encontramos una compra activa asociada a este correo.", 403);
     }
@@ -163,13 +144,8 @@ serve(async (req) => {
       .eq("course_slug", COURSE_SLUG)
       .eq("published", true)
       .maybeSingle();
-
-    if (courseError) {
-      throw new AccessError("No fue posible cargar el curso.", 500);
-    }
-    if (!courseRow?.payload) {
-      throw new AccessError("El contenido protegido aún no fue publicado.", 503);
-    }
+    if (courseError) throw new AccessError("No fue posible cargar el curso.", 500);
+    if (!courseRow?.payload) throw new AccessError("El contenido protegido aún no fue publicado.", 503);
 
     const { data: library, error: libraryError } = await admin
       .from("evidence_library")
@@ -177,17 +153,32 @@ serve(async (req) => {
       .eq("course_slug", COURSE_SLUG)
       .eq("published", true)
       .order("sort_order", { ascending: true });
+    if (libraryError) throw new AccessError("No fue posible cargar la biblioteca científica.", 500);
 
-    if (libraryError) {
-      throw new AccessError("No fue posible cargar la biblioteca científica.", 500);
-    }
+    const { data: weeklyRows, error: weeklyError } = await admin
+      .from("evidence_weekly_alerts")
+      .select("alert_date,payload,sort_order")
+      .eq("course_slug", COURSE_SLUG)
+      .eq("published", true)
+      .order("alert_date", { ascending: false })
+      .order("sort_order", { ascending: true });
+    if (weeklyError) throw new AccessError("No fue posible cargar las alertas de evidencia.", 500);
+
+    const latestAlertDate = weeklyRows?.[0]?.alert_date || null;
+    const weeklyEvidence = {
+      version: latestAlertDate ? `${latestAlertDate}.1` : "sin-alertas",
+      lastReviewed: latestAlertDate,
+      editorialNote: "Contenido completo para usuarios con acceso a Evidencia Aplicada. Cada alerta separa hallazgo, calidad y limitaciones, implicación clínica e implicación docente.",
+      items: (weeklyRows || []).map((row: any) => row.payload),
+      watchlist: [],
+    };
 
     return new Response(JSON.stringify({
       access,
       version: courseRow.version,
       updatedAt: courseRow.updated_at,
       course: courseRow.payload,
-      library: (library || []).map((item) => ({
+      library: (library || []).map((item: any) => ({
         id: item.item_id,
         title: item.title,
         sourceType: item.source_type,
@@ -200,20 +191,15 @@ serve(async (req) => {
         tags: item.tags || [],
         originalRelation: item.original_relation,
       })),
+      weeklyEvidence,
     }), {
       status: 200,
       headers: corsHeaders,
     });
   } catch (error) {
     const status = error instanceof AccessError ? error.status : 500;
-    const message = error instanceof Error
-      ? error.message
-      : "Error inesperado al cargar el contenido.";
-
+    const message = error instanceof Error ? error.message : "Error inesperado al cargar el contenido.";
     console.error("evidence-content error", error);
-    return new Response(JSON.stringify({ message }), {
-      status,
-      headers: corsHeaders,
-    });
+    return new Response(JSON.stringify({ message }), { status, headers: corsHeaders });
   }
 });
