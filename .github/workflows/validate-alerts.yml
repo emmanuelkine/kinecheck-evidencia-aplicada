@@ -7,6 +7,7 @@ on:
       - "weekly-alerts-professional.js"
       - "weekly-alerts.json"
       - "index.html"
+      - "supabase/functions/evidence-content/index.ts"
       - ".github/workflows/validate-alerts.yml"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "weekly-alerts-professional.js"
       - "weekly-alerts.json"
       - "index.html"
+      - "supabase/functions/evidence-content/index.ts"
       - ".github/workflows/validate-alerts.yml"
 
 permissions:
@@ -38,51 +40,34 @@ jobs:
           node --check weekly-alerts.js
           node --check weekly-alerts-professional.js
 
-      - name: Validar estructura y clasificación editorial
+      - name: Confirmar que el archivo estático no contiene evidencia premium
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const data = JSON.parse(fs.readFileSync('weekly-alerts.json', 'utf8'));
-          const required = [
-            'id', 'alertDate', 'source', 'status', 'title', 'citation',
-            'studyType', 'population', 'mainFinding', 'quality',
-            'clinicalImplication', 'teachingImplication', 'url'
-          ];
-          if (data.contentClassification !== 'public-evidence-digest') {
-            throw new Error('La clasificación editorial del archivo no es válida.');
+          if (data.contentClassification !== 'protected-server-delivery') {
+            throw new Error('weekly-alerts.json debe ser solo un marcador de contenido protegido.');
           }
-          if (!String(data.editorialNote || '').includes('No contiene datos de usuarios')) {
-            throw new Error('Falta la declaración explícita de protección de datos.');
+          if (!Array.isArray(data.items) || data.items.length !== 0) {
+            throw new Error('El archivo estático no puede contener fichas completas de evidencia.');
           }
-          if (!Array.isArray(data.items) || data.items.length === 0) {
-            throw new Error('La lista de alertas está vacía.');
+          if (!Array.isArray(data.watchlist) || data.watchlist.length !== 0) {
+            throw new Error('La vigilancia detallada tampoco debe publicarse como activo estático.');
           }
-          const forbiddenFields = new Set([
-            'email', 'user_id', 'userId', 'password', 'access_token',
-            'refresh_token', 'transaction_id', 'license_key', 'clinical_record'
-          ]);
-          const ids = new Set();
-          for (const item of data.items) {
-            for (const field of required) {
-              if (!String(item[field] || '').trim()) {
-                throw new Error(`Falta ${field} en ${item.id || 'registro sin id'}.`);
-              }
-            }
-            for (const field of Object.keys(item)) {
-              if (forbiddenFields.has(field)) {
-                throw new Error(`Campo sensible no permitido en ${item.id}: ${field}`);
-              }
-            }
-            if (ids.has(item.id)) throw new Error(`ID duplicado: ${item.id}`);
-            ids.add(item.id);
-            const url = new URL(item.url);
-            if (url.protocol !== 'https:') throw new Error(`URL insegura: ${item.url}`);
-          }
-          if (!Array.isArray(data.watchlist)) {
-            throw new Error('watchlist debe ser una lista.');
-          }
-          console.log(`Alertas verificadas y clasificadas: ${data.items.length}`);
+          console.log('Activo público saneado: sin contenido premium.');
           NODE
+
+      - name: Confirmar entrega protegida desde Supabase
+        run: |
+          grep -q 'functions/v1' weekly-alerts.js
+          grep -q 'weeklyEvidence' weekly-alerts.js
+          if grep -q 'weekly-alerts.json' weekly-alerts.js; then
+            echo 'weekly-alerts.js todavía intenta cargar el JSON público' >&2
+            exit 1
+          fi
+          grep -q 'evidence_weekly_alerts' supabase/functions/evidence-content/index.ts
+          grep -q 'Cache-Control' supabase/functions/evidence-content/index.ts
+          grep -q 'private, no-store' supabase/functions/evidence-content/index.ts
 
       - name: Confirmar integración y contraste en la interfaz
         run: |
