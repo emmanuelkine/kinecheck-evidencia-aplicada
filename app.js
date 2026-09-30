@@ -3,6 +3,10 @@ window.KineCheckCourse=(()=>{
   const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const journeys=()=>D.modules.flatMap((m,mi)=>m.journeys.map((j,ji)=>({...j,_module:m,_mi:mi,_ji:ji,id:j.id||`${mi}-${ji}`})));
   const activity=id=>S.activities[id]||(S.activities[id]={});
+  const academicAssignments=()=>S.academicAssignments||(S.academicAssignments={});
+  const hasAcademicActivities=()=>Boolean((D.moduleAssignments||[]).length||D.finalAssessment);
+  const academicExpected=()=>((D.moduleAssignments||[]).length+(D.finalAssessment?1:0));
+  const academicDone=()=>Object.values(academicAssignments()).filter(x=>x&&x.completedAt).length;
   async function save(){await window.KineCheckProgress.push(S);updateProgress()}
   function activityScore(a={}){return ['openedAt','labSavedAt','caseSavedAt','reflectionSavedAt','reviewedAt'].filter(k=>a[k]).length}
   function updateProgress(){const all=journeys(),max=Math.max(1,all.length*5),score=all.reduce((n,j)=>n+activityScore(S.activities[j.id]),0),pct=Math.round(score/max*100);const el=document.getElementById('progress');if(el)el.textContent=`Ruta personal ${pct}%`;return pct}
@@ -64,13 +68,75 @@ window.KineCheckCourse=(()=>{
     app.innerHTML=`<div class="lesson-head"><h1>Cuaderno clínico</h1><p>Registro personal de razonamientos, decisiones y metarreflexiones.</p><button class="btn secondary" id="export-notebook">Exportar cuaderno</button></div>${entries.length?entries.map(([k,n])=>`<article class="notebook-entry"><div><span class="badge">${esc(({lab:'Laboratorio',case:'Decisión clínica',reflection:'Metarreflexión'})[n.type]||n.type)}</span><small>${esc(new Date(n.updatedAt).toLocaleString('es-CL'))}</small></div><h3>${esc(n.journey)}</h3><p class="source">${esc(n.module)}</p><p>${esc(n.text)||'<em>Sin contenido</em>'}</p></article>`).join(''):'<div class="block">Aún no has guardado reflexiones.</div>'}`;
     document.getElementById('export-notebook').onclick=()=>{const blob=new Blob([JSON.stringify({course:D.title,profile:S.profile,notes:S.notes},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cuaderno-clinico-kinecheck.json';a.click();URL.revokeObjectURL(a.href)};
   }
+
+  function academic(){
+    setActive("academic");
+    const assignments=D.moduleAssignments||[];
+    const final=D.finalAssessment||null;
+    const records=academicAssignments();
+    const all=assignments.map((x,i)=>Object.assign({},x,{_key:"module-"+(x.moduleNumber||i+1)}));
+    if(final) all.push(Object.assign({},final,{_key:"final"}));
+    let html='<div class="lesson-head"><span class="badge">Carga académica certificable</span><h1>Actividades obligatorias de aplicación</h1><p>';
+    html+=esc((D.academicLoad&&D.academicLoad.methodology)||"Completa las actividades requeridas y guarda cada desarrollo.");
+    html+='</p><div class="outcomes"><strong>Avance:</strong> '+academicDone()+' de '+academicExpected()+' actividades completadas · '+esc((D.academicLoad&&D.academicLoad.certifiableHours)||"")+' h certificables.</div></div>';
+    all.forEach((item,i)=>{
+      const rec=records[item._key]||{};
+      const criteria=item.criteria||[];
+      html+='<section class="lab" data-academic-card="'+esc(item._key)+'"><span class="badge">'+Number(item.durationMinutes||0)+' min</span><h2>'+esc(item.title)+'</h2><p>'+esc(item.prompt)+'</p>';
+      html+='<textarea id="academic-'+i+'" placeholder="Desarrolla tu respuesta con razonamiento explícito...">'+esc(rec.text||"")+'</textarea>';
+      if(criteria.length){
+        html+='<div class="clinical-list"><strong>Criterios de finalización</strong>';
+        criteria.forEach((label,j)=>{
+          html+='<label style="display:block;margin:8px 0"><input type="checkbox" data-academic-check="'+i+'-'+j+'" '+(rec.completedAt?"checked":"")+'> '+esc(label)+'</label>';
+        });
+        html+='</div>';
+      }
+      html+='<button class="btn" data-academic-save="'+i+'">'+(rec.completedAt?"Completada ✓":"Guardar actividad")+'</button>';
+      html+='<p class="source" data-academic-message="'+i+'">'+(rec.completedAt?("Completada "+esc(new Date(rec.completedAt).toLocaleString("es-CL"))):("Respuesta mínima: "+Number(item.minimumCharacters||350)+" caracteres y todos los criterios marcados."))+'</p></section>';
+    });
+    app.innerHTML=html;
+    app.querySelectorAll("[data-academic-save]").forEach(button=>button.onclick=async()=>{
+      const i=Number(button.dataset.academicSave);
+      const item=all[i];
+      const key=item._key;
+      const textValue=(document.getElementById("academic-"+i)?.value||"").trim();
+      const checks=[...app.querySelectorAll('[data-academic-check^="'+i+'-"]')];
+      const message=app.querySelector('[data-academic-message="'+i+'"]');
+      const minimum=Number(item.minimumCharacters||350);
+      if(textValue.length<minimum){
+        if(message) message.textContent="Desarrolla al menos "+minimum+" caracteres antes de guardar.";
+        return;
+      }
+      if(checks.length&&!checks.every(x=>x.checked)){
+        if(message) message.textContent="Marca todos los criterios de revisión antes de completar la actividad.";
+        return;
+      }
+      academicAssignments()[key]={
+        text:textValue,
+        criteria:(item.criteria||[]).map((label,j)=>({label:label,checked:checks[j]?.checked!==false})),
+        durationMinutes:Number(item.durationMinutes||0),
+        completedAt:new Date().toISOString(),
+        updatedAt:new Date().toISOString()
+      };
+      S.notes["academic-"+key]={text:textValue,module:"Carga académica",journey:item.title,type:"academic",updatedAt:new Date().toISOString()};
+      await save();
+      buildNav();
+      academic();
+    });
+  }
   function integration(){setActive('integration');app.innerHTML=`<div class="lesson-head"><h1>Laboratorio integrador</h1><p>Construye una formulación revisable, una decisión compartida y un plan de reevaluación.</p></div><section class="case"><h2>Caso complejo</h2><p>Persona de 47 años con dolor lumbar persistente, sueño irregular, temor a flexionarse, cambios degenerativos en resonancia, baja actividad y tratamientos pasivos previos.</p></section>${['¿Qué hipótesis mantienes abiertas?','¿Qué información cambiaría tu decisión?','¿Qué abordarías primero y por qué?','¿Cómo comunicarías la imagen?','¿Qué experimento clínico propondrías?','¿Cómo evaluarías si tu hipótesis mejora?'].map((q,i)=>`<section class="reflection"><h3>${q}</h3><textarea id="int${i}">${esc(S.notes[`integration-${i}`]?.text||'')}</textarea><button class="btn" data-int="${i}">Guardar</button></section>`).join('')}`;app.querySelectorAll('[data-int]').forEach(b=>b.onclick=async()=>{const i=b.dataset.int,text=document.getElementById(`int${i}`).value.trim();S.notes[`integration-${i}`]={text,module:'Laboratorio integrador',journey:'Caso complejo',type:'integration',updatedAt:new Date().toISOString()};await save();b.textContent='Guardado ✓'})}
   function wireShell(){
-    document.querySelectorAll('.sidebar>button').forEach(b=>b.onclick=()=>{({home,library,notebook,integration}[b.dataset.view]||home)();closeMobile()});
+    if(hasAcademicActivities()&&!document.querySelector('[data-view="academic"]')){
+      const ecosystem=document.querySelector('.sidebar .ecosystem'),button=document.createElement('button');
+      button.dataset.view='academic';
+      button.textContent='Carga académica · '+((D.academicLoad&&D.academicLoad.certifiableHours)||'')+' h';
+      if(ecosystem&&ecosystem.parentNode) ecosystem.parentNode.insertBefore(button,ecosystem);
+    }
+    document.querySelectorAll('.sidebar>button').forEach(b=>b.onclick=()=>{({home,library,notebook,integration,academic}[b.dataset.view]||home)();closeMobile()});
     document.getElementById('mobile-menu').onclick=()=>{document.getElementById('sidebar').classList.add('mobile-open');document.getElementById('nav-overlay').hidden=false};
     document.getElementById('close-menu').onclick=closeMobile;document.getElementById('nav-overlay').onclick=closeMobile;
     document.getElementById('change-profile').onclick=async()=>{S.profile=S.profile==='professional'?'student':'professional';await save();document.getElementById('profile-label').textContent=profileText();home()};
   }
-  function start(s,state,content){session=s;D=content.course;LIB=content.library||[];S={...window.KineCheckProgress.defaultState(),...state,activities:state.activities||{},notes:state.notes||{},bookmarks:state.bookmarks||[]};app=document.getElementById('app');nav=document.getElementById('nav');document.getElementById('profile-label').textContent=profileText();wireShell();buildNav();home();updateProgress()}
+  function start(s,state,content){session=s;D=content.course;LIB=content.library||[];S={...window.KineCheckProgress.defaultState(),...state,activities:state.activities||{},notes:state.notes||{},bookmarks:state.bookmarks||[],academicAssignments:state.academicAssignments||{}};app=document.getElementById('app');nav=document.getElementById('nav');document.getElementById('profile-label').textContent=profileText();wireShell();buildNav();home();updateProgress()}
   return{start,showJourney,store};
 })();
