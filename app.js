@@ -7,7 +7,31 @@ window.KineCheckCourse=(()=>{
   const hasAcademicActivities=()=>Boolean((D.moduleAssignments||[]).length||D.finalAssessment);
   const academicExpected=()=>((D.moduleAssignments||[]).length+(D.finalAssessment?1:0));
   const academicDone=()=>Object.values(academicAssignments()).filter(x=>x&&x.completedAt).length;
-  async function save(){await window.KineCheckProgress.push(S);updateProgress()}
+  async function syncCertificateEligibility(){
+    const C=window.KINECHECK_CONFIG||{};
+    if(!session?.access_token||!C.supabaseUrl||!C.supabaseAnonKey||!C.courseSlug)return;
+    const pct=updateProgress();
+    if(C.courseSlug==='evidencia-aplicada'&&pct<100)return;
+    if(C.courseSlug==='dolor-musculoesqueletico'&&(pct<100||academicDone()<academicExpected()))return;
+    try{
+      const response=await fetch(String(C.supabaseUrl).replace(/\/$/,'')+'/functions/v1/course-completion-sync',{
+        method:'POST',
+        cache:'no-store',
+        headers:{
+          Authorization:'Bearer '+session.access_token,
+          apikey:C.supabaseAnonKey,
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({courseSlug:C.courseSlug})
+      });
+      const payload=await response.json().catch(()=>({}));
+      if(response.ok&&payload?.eligible){
+        const el=document.getElementById('sync-status');
+        if(el)el.textContent='Curso completado · certificado habilitado';
+      }
+    }catch{}
+  }
+  async function save(){await window.KineCheckProgress.push(S);updateProgress();void syncCertificateEligibility()}
   function activityScore(a={}){return ['openedAt','labSavedAt','caseSavedAt','reflectionSavedAt','reviewedAt'].filter(k=>a[k]).length}
   function updateProgress(){const all=journeys(),max=Math.max(1,all.length*5),score=all.reduce((n,j)=>n+activityScore(S.activities[j.id]),0),pct=Math.round(score/max*100);const el=document.getElementById('progress');if(el)el.textContent=`Ruta personal ${pct}%`;return pct}
   function setActive(v){document.querySelectorAll('.sidebar button').forEach(b=>b.classList.toggle('active',b.dataset.view===v))}
@@ -137,6 +161,6 @@ window.KineCheckCourse=(()=>{
     document.getElementById('close-menu').onclick=closeMobile;document.getElementById('nav-overlay').onclick=closeMobile;
     document.getElementById('change-profile').onclick=async()=>{S.profile=S.profile==='professional'?'student':'professional';await save();document.getElementById('profile-label').textContent=profileText();home()};
   }
-  function start(s,state,content){session=s;D=content.course;LIB=content.library||[];S={...window.KineCheckProgress.defaultState(),...state,activities:state.activities||{},notes:state.notes||{},bookmarks:state.bookmarks||[],academicAssignments:state.academicAssignments||{}};app=document.getElementById('app');nav=document.getElementById('nav');document.getElementById('profile-label').textContent=profileText();wireShell();buildNav();home();updateProgress()}
+  function start(s,state,content){session=s;D=content.course;LIB=content.library||[];S={...window.KineCheckProgress.defaultState(),...state,activities:state.activities||{},notes:state.notes||{},bookmarks:state.bookmarks||[],academicAssignments:state.academicAssignments||{}};app=document.getElementById('app');nav=document.getElementById('nav');document.getElementById('profile-label').textContent=profileText();wireShell();buildNav();home();updateProgress();void syncCertificateEligibility()}
   return{start,showJourney,store};
 })();
