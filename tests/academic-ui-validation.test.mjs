@@ -4,12 +4,18 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
-test('empty lab, case and reflection answers never write progress',async()=>{
+test('empty answers never write progress and keep field feedback during background sync',async()=>{
   let writes=0;
-  const status={textContent:''},context=vm.createContext({window:{KineCheckProgress:{async push(){writes++}}},document:{getElementById(id){return id==='sync-status'?status:{value:'   '}}},console,URL});
+  let feedback=null;
+  const field={value:'   ',parentElement:{querySelector(){return feedback;}},after(element){feedback=element;}};
+  const status={textContent:''},context=vm.createContext({window:{KineCheckProgress:{async push(){writes++}}},document:{getElementById(id){return id==='sync-status'?status:field;},createElement(){return {dataset:{},textContent:'',attributes:{},setAttribute(name,value){this.attributes[name]=value;}};}},console,URL});
   vm.runInContext(source,context);
   for(const type of ['lab','case','reflection'])await context.window.KineCheckCourse.store('lesson',type,'field',{title:'Lesson'},{title:'Module'});
-  assert.equal(writes,0);assert.equal(status.textContent,'Escribe tu razonamiento antes de guardar.');
+  assert.equal(writes,0);
+  assert.equal(feedback.textContent,'Escribe tu razonamiento antes de guardar.');
+  assert.equal(feedback.attributes.role,'alert');
+  status.textContent='Avance sincronizado';
+  assert.equal(feedback.textContent,'Escribe tu razonamiento antes de guardar.');
 });
 test('library links expose original references with safe, escaped destinations',()=>{
   const start=source.indexOf('  const esc='),end=source.indexOf('  const journeys=');
